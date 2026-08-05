@@ -1,4 +1,4 @@
-// 날씨 상점의 상품·주문을 서버 메모리에 보관합니다. DB가 아니므로 재시작하면 초기 재고로 리셋됩니다.
+// 날씨 상점의 상품·주문을 서버 메모리에 보관한다. DB가 아니므로 재시작하면 초기 재고로 리셋된다.
 // tags는 weatherAdvice.js의 getConditionTags() / styleItems.js와 같은 값(rain/windy/hot/cold)을 써서,
 // "오늘의 추천" 아이템과 상점 상품을 같은 기준으로 연결할 수 있게 한다.
 let products = [

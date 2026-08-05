@@ -11,7 +11,7 @@ import { sendError, sendJson, waitForRequestedDelay } from './utils/httpUtils.js
 const port = Number(process.env.API_PORT ?? 3011)
 
 const server = http.createServer(async (request, response) => {
-  // 브라우저가 교차 출처 요청 전에 보내는 CORS 사전 요청입니다.
+  // 브라우저가 교차 출처 요청 전에 보내는 CORS 사전 요청이다.
   if (request.method === 'OPTIONS') {
     sendJson(response, 204)
     return
@@ -21,16 +21,16 @@ const server = http.createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', `http://${host}`)
 
   try {
-    // ?delay=1500처럼 전달하면 최대 3초까지 응답을 늦출 수 있습니다.
+    // ?delay=1500처럼 전달하면 최대 3초까지 응답을 늦출 수 있다.
     await waitForRequestedDelay(url)
 
-    // API 서버의 실행 상태를 확인하는 엔드포인트입니다.
+    // API 서버의 실행 상태를 확인하는 엔드포인트.
     if (request.method === 'GET' && url.pathname === '/api/health') {
       sendJson(response, 200, { status: 'ok', cityCount: getCityCount() })
       return
     }
 
-    // 각 라우터는 자신이 요청을 처리했으면 true를 반환합니다.
+    // 각 라우터는 자신이 요청을 처리했으면 true를 반환한다.
     if (await handleCitiesRoutes(request, response, url)) return
     if (await handleNotesRoutes(request, response, url)) return
     if (await handleShopRoutes(request, response, url)) return
