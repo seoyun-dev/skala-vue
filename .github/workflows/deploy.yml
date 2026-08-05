@@ -40,7 +40,8 @@ jobs:
         run: npm run build
         env:
           VITE_OPENWEATHER_API_KEY: ${{ secrets.VITE_OPENWEATHER_API_KEY }}
-          
+          VITE_UNSPLASH_ACCESS_KEY: ${{ secrets.VITE_UNSPLASH_ACCESS_KEY }}
+
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v6
 
