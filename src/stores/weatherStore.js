@@ -56,9 +56,12 @@ function toCityCard(raw, koreanName) {
 
 // OpenWeatherMap의 weather[0].main 값을 배경 테마 키로 매핑
 // (App.vue가 이 값에 따라 전체 화면 배경을 그 날씨처럼 바꾼다)
+// Thunderstorm은 예전엔 Rain과 같은 테마를 썼는데, 그러면 천둥 치는 날에도 그냥 평범한 빗물
+// 사진만 나와서 구분이 안 됐다. 번개 사진이 따로 나오도록 테마를 분리했다.
 function mapStatusToTheme(statusMain) {
   if (statusMain === 'Clear') return 'sunny'
-  if (['Rain', 'Drizzle', 'Thunderstorm'].includes(statusMain)) return 'rain'
+  if (statusMain === 'Thunderstorm') return 'thunder'
+  if (['Rain', 'Drizzle'].includes(statusMain)) return 'rain'
   if (statusMain === 'Snow') return 'snow'
   if (statusMain === 'Clouds') return 'cloudy'
   return 'default'
@@ -75,7 +78,7 @@ export const useWeatherStore = defineStore('weather', () => {
   const selectedCity = ref(null)
 
   // 카드를 선택하거나 상세페이지에 들어가면 그 도시의 날씨에 맞춰
-  // App.vue의 전체 배경이 바뀌도록 하는 전역 테마 상태 ('default'|'sunny'|'cloudy'|'rain'|'snow')
+  // App.vue의 전체 배경이 바뀌도록 하는 전역 테마 상태 ('default'|'sunny'|'cloudy'|'rain'|'thunder'|'snow')
   const activeTheme = ref('default')
   function setActiveTheme(statusMain) {
     activeTheme.value = mapStatusToTheme(statusMain)

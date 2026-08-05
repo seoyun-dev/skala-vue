@@ -5,12 +5,15 @@ import axios from 'axios'
 // 그대로 폴백된다 (키가 없어도 절대 깨지지 않아야 한다는 요구사항).
 const ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY
 
-// App.vue의 activeTheme 값('sunny'|'cloudy'|'rain'|'snow'|'default')을 검색어로 매핑
+// App.vue의 activeTheme 값('sunny'|'cloudy'|'rain'|'thunder'|'snow'|'default')을 검색어로 매핑.
+// 너무 짧고 막연한 검색어(예: 'rain storm sky')는 날씨와 상관없는 사진이나, rain인데 번개 사진처럼
+// 엉뚱한 결과가 자주 나와서, 실제로 그 날씨를 담은 사진이 나오도록 좀 더 구체적으로 적었다.
 const THEME_QUERY = {
-  sunny: 'clear blue sky sunny',
-  cloudy: 'cloudy overcast sky',
-  rain: 'rain storm sky',
-  snow: 'snow winter landscape',
+  sunny: 'clear blue sky sunny aesthetic',
+  cloudy: 'dramatic cloudy sky landscape',
+  rain: 'heavy rain window droplets city',
+  thunder: 'thunderstorm lightning dramatic night sky',
+  snow: 'snowfall winter forest aesthetic',
   default: 'blue sky white clouds daytime',
 }
 

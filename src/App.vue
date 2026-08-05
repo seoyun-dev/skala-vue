@@ -145,7 +145,7 @@ body {
     linear-gradient(165deg, #2b2f38 0%, #20232b 55%, #17191e 100%);
 }
 
-/* 🌧️ 비일 때는 깊은 청록빛 + 빗줄기 오버레이 */
+/* 🌧️ 비일 때는 깊은 청록빛 톤으로 */
 .sky-shell.theme-rain {
   --sky-accent: #38bdf8;
   --sky-accent-deep: #1d4ed8;
@@ -157,29 +157,18 @@ body {
     radial-gradient(950px 650px at -10% 25%, rgba(30, 64, 175, 0.18), transparent 55%),
     linear-gradient(165deg, #0d1830 0%, #0a1220 55%, #070b12 100%);
 }
-.sky-shell.theme-rain::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 55;
-  pointer-events: none;
-  opacity: 0.3;
-  background-image: repeating-linear-gradient(
-    100deg,
-    transparent 0 4px,
-    rgba(186, 230, 253, 0.16) 4px 5px,
-    transparent 5px 42px
-  );
-  background-size: 140px 240px;
-  animation: rainFall 0.85s linear infinite;
-}
-@keyframes rainFall {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: -18px 240px;
-  }
+/* ⛈️ 천둥일 때는 비보다 한층 더 어둡고 보랏빛 도는 톤으로 — 같은 rain 톤을 쓰면 천둥 치는 날인지
+   그냥 비 오는 날인지 화면만 보고는 구분이 안 됐다. */
+.sky-shell.theme-thunder {
+  --sky-accent: #c4b5fd;
+  --sky-accent-deep: #6d28d9;
+  --orb-a: rgba(167, 139, 250, 0.45);
+  --orb-b: rgba(109, 40, 217, 0.34);
+  --orb-c: rgba(196, 181, 253, 0.22);
+  background:
+    radial-gradient(1100px 750px at 82% -8%, rgba(167, 139, 250, 0.22), transparent 60%),
+    radial-gradient(950px 650px at -10% 25%, rgba(109, 40, 217, 0.18), transparent 55%),
+    linear-gradient(165deg, #180f28 0%, #120a1c 55%, #07050c 100%);
 }
 
 /* ❄️ 눈일 때는 새하얀 얼음빛 톤으로 */
@@ -220,27 +209,6 @@ body {
     rgba(10, 14, 23, 0.82) 100%
   );
 }
-/* ☁️ 기본(default) 테마일 때만 — 밝은 하늘 사진 위로 구름이 천천히 흘러가는 느낌을 더한다 */
-.sky-shell.theme-default .photo-bg::before {
-  content: '';
-  position: absolute;
-  inset: -10% -60%;
-  background-image:
-    radial-gradient(ellipse 260px 90px at 15% 30%, rgba(255, 255, 255, 0.4), transparent 70%),
-    radial-gradient(ellipse 320px 100px at 55% 60%, rgba(255, 255, 255, 0.3), transparent 70%),
-    radial-gradient(ellipse 220px 80px at 85% 20%, rgba(255, 255, 255, 0.32), transparent 70%);
-  animation: cloudDrift 50s linear infinite alternate;
-  opacity: 0.55;
-}
-@keyframes cloudDrift {
-  from {
-    transform: translateX(-8%);
-  }
-  to {
-    transform: translateX(8%);
-  }
-}
-
 /* ── 떠다니는 배경 오브 (테마에 따라 색이 함께 바뀐다) ───────────────────────── */
 .orb {
   position: absolute;
