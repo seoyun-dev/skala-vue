@@ -1,10 +1,13 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 // 1. 컴포넌트 파일명 국룰 표기법(PascalCase) 매칭 수입
 import BaseDashboardCard from './BaseDashboardCard.vue'
 import SearchBar from './SearchBar.vue'
 import WeatherCard from './WeatherCard.vue'
+import MyLocationCard from './MyLocationCard.vue'
+import CountryPanel from './CountryPanel.vue'
 import { useWeatherStore } from '@/stores/weatherStore'
 
 // 날씨 목록·검색·저장 로직은 모두 Pinia 스토어가 소유한다.
@@ -46,10 +49,30 @@ const isRemoteResult = computed(
 )
 
 const addCity = (city) => {
+  const alreadyExists = weatherStore.weatherList.some((item) => item.id === city.id)
   weatherStore.addCity(city)
   // 검색어를 비우면 watch가 원격 검색 상태까지 정리하고 전체 목록으로 되돌아간다
   searchQuery.value = ''
+  if (alreadyExists) {
+    ElMessage.warning(`${city.name} 카드는 이미 목록에 있어요.`)
+  } else {
+    ElMessage.success(`${city.name} 카드를 목록에 추가했어요.`)
+  }
 }
+
+const removeCity = (city) => {
+  weatherStore.removeCity(city)
+  ElMessage.info(`${city.name} 카드를 목록에서 제거했어요.`)
+}
+
+// mock-api 서버 동기화 상태가 바뀔 때마다 결과를 토스트로도 안내
+watch(
+  () => weatherStore.serverSyncStatus,
+  (status) => {
+    if (status === 'success') ElMessage.success('현재 목록을 서버에 저장했어요.')
+    else if (status === 'error') ElMessage.error('서버 저장에 실패했어요. mock-api가 켜져 있는지 확인해 주세요.')
+  },
+)
 
 // 상세보기 클릭 시 라우터로 동적 파라미터(/weather/:cityId) 상세 페이지 이동
 // 한글 지명은 API가 돌려주지 않으므로 쿼리로 함께 넘긴다
@@ -72,6 +95,10 @@ const syncLabel = computed(() => {
 </script>
 
 <template>
+  <div class="pinned-location">
+    <MyLocationCard />
+  </div>
+
   <div class="dashboard-wrapper">
     <aside class="dash-side">
       <BaseDashboardCard style="--index: 1">
@@ -82,6 +109,8 @@ const syncLabel = computed(() => {
         <span class="status-dot"></span>
         {{ weatherStore.selectedCityInfo }}
       </div>
+
+      <CountryPanel :country-code="weatherStore.selectedCity?.country" />
     </aside>
 
     <BaseDashboardCard class="dash-list" style="--index: 2">
@@ -97,6 +126,19 @@ const syncLabel = computed(() => {
           >
             {{ syncLabel }}
           </button>
+          <el-popconfirm
+            title="현재 목록을 지우고 기본 도시로 되돌릴까요?"
+            confirm-button-text="재설정"
+            cancel-button-text="취소"
+            width="220"
+            @confirm="weatherStore.resetToDefault"
+          >
+            <template #reference>
+              <button class="reset-btn" title="현재 목록을 지우고 기본 도시로 되돌립니다">
+                기본 도시로 재설정
+              </button>
+            </template>
+          </el-popconfirm>
           <span class="count-chip">{{ displayList.length }}개 도시</span>
         </div>
       </div>
@@ -129,12 +171,13 @@ const syncLabel = computed(() => {
             @select-card="
               (msg) => {
                 weatherStore.selectedCityInfo = msg
+                weatherStore.selectedCity = item
                 weatherStore.setActiveTheme(item.statusMain)
               }
             "
             @click-detail="goDetail(item)"
             @add-card="addCity(item)"
-            @remove-card="weatherStore.removeCity(item)"
+            @remove-card="removeCity(item)"
           />
         </div>
 
@@ -161,6 +204,12 @@ const syncLabel = computed(() => {
 </template>
 
 <style scoped>
+/* 내 위치 기반 카드 — 검색/목록보다 위, 페이지 상단에 고정으로 배치 */
+.pinned-location {
+  display: block;
+  margin-bottom: 24px;
+}
+
 /* PC: 좌측 고정 사이드바(검색·상태) + 우측 카드 그리드 투컬럼 */
 .dashboard-wrapper {
   width: 100%;
@@ -247,6 +296,23 @@ const syncLabel = computed(() => {
 .sync-btn:disabled {
   cursor: default;
   opacity: 0.7;
+}
+.reset-btn {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--sky-ink-dim);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.3s var(--sky-ease);
+}
+.reset-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--sky-ink);
 }
 .sync-btn.success {
   color: #86efac;

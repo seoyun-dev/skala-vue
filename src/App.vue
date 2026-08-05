@@ -1,23 +1,78 @@
 <script setup>
-import { RouterView } from 'vue-router'
+import { ref, watch } from 'vue'
+import { RouterView, RouterLink, useRouter } from 'vue-router'
 import { useWeatherStore } from '@/stores/weatherStore'
+import { useAuthStore } from '@/stores/authStore'
+import { useConfigStore } from '@/stores/configStore'
+import { fetchThemeBackground } from '@/utils/unsplashApi'
 
-// ✨ 추가: 카드를 선택하거나 상세페이지에 들어가면 그 도시의 실제 날씨에 맞춰
+// 카드를 선택하거나 상세페이지에 들어가면 그 도시의 실제 날씨에 맞춰
 // 화면 전체 배경(그라디언트·오브 색상·포인트 컬러)이 바뀐다.
 const weatherStore = useWeatherStore()
+const authStore = useAuthStore()
+const configStore = useConfigStore()
+const router = useRouter()
+
+function logout() {
+  authStore.logout()
+  router.push('/')
+}
+
+// Unsplash 키가 설정돼 있으면 테마에 맞는 실제 사진으로, 없으면 기존 그라디언트로 자동 대체
+const photoBgUrl = ref(null)
+watch(
+  () => weatherStore.activeTheme,
+  async (theme) => {
+    photoBgUrl.value = await fetchThemeBackground(theme)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <div class="sky-shell" :class="`theme-${weatherStore.activeTheme}`">
-    <!-- 배경 장식: 메시 그라디언트 오브 -->
+    <div
+      class="photo-bg"
+      :class="{ 'is-visible': photoBgUrl }"
+      :style="photoBgUrl ? { backgroundImage: `url(${photoBgUrl})` } : {}"
+      aria-hidden="true"
+    ></div>
+
     <div class="orb orb-a" aria-hidden="true"></div>
     <div class="orb orb-b" aria-hidden="true"></div>
     <div class="orb orb-c" aria-hidden="true"></div>
     <div class="grain" aria-hidden="true"></div>
 
+    <header class="app-header">
+      <div class="app-header-inner">
+        <RouterLink to="/" class="brand">
+          <span class="brand-glyph">🌤️</span>
+          <span class="brand-text">한눈에 보는 하늘</span>
+        </RouterLink>
+
+        <nav class="top-nav">
+          <RouterLink to="/" class="nav-link">대시보드</RouterLink>
+          <RouterLink to="/shop" class="nav-link">상점</RouterLink>
+          <RouterLink to="/about" class="nav-link">소개</RouterLink>
+          <RouterLink v-if="!authStore.isLoggedIn" to="/login" class="nav-link nav-link-accent">로그인</RouterLink>
+          <template v-else>
+            <span class="nav-user">{{ authStore.currentUser.name }}님</span>
+            <button class="nav-link" @click="logout">로그아웃</button>
+          </template>
+          <button
+            class="unit-toggle"
+            type="button"
+            :title="`단위 변경 (현재 ${configStore.unitSymbol})`"
+            @click="configStore.toggleUnit"
+          >
+            {{ configStore.unitSymbol }}
+          </button>
+        </nav>
+      </div>
+    </header>
+
     <main class="sky-main">
       <header class="hero">
-        <span class="eyebrow">Weather Intelligence</span>
         <h1 class="hero-title">
           오늘의 하늘을<br />
           <em>한눈에</em> 읽어드립니다
@@ -44,17 +99,9 @@ const weatherStore = useWeatherStore()
   --orb-c: rgba(56, 189, 248, 0.24);
 }
 
-/* 기본 템플릿(main.css)의 레이아웃 제약 해제 */
 body {
-  display: block !important;
   background: #0b0f18;
   min-height: 100dvh;
-}
-#app {
-  max-width: none !important;
-  padding: 0 !important;
-  display: block !important;
-  font-weight: normal;
 }
 
 /* ── 화면 전체 배경: 선택한 도시의 날씨에 맞춰 부드럽게 전환된다 ───────────── */
@@ -148,6 +195,52 @@ body {
     linear-gradient(165deg, #16202e 0%, #101822 55%, #0a0f16 100%);
 }
 
+/* ── Unsplash 사진 배경 (키가 없으면 opacity 0으로 완전히 숨겨져 그라디언트만 보인다) ───── */
+.photo-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 1.6s var(--sky-ease);
+  pointer-events: none;
+}
+.photo-bg.is-visible {
+  opacity: 1;
+}
+.photo-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    165deg,
+    rgba(10, 14, 23, 0.78) 0%,
+    rgba(10, 14, 23, 0.5) 55%,
+    rgba(10, 14, 23, 0.82) 100%
+  );
+}
+/* ☁️ 기본(default) 테마일 때만 — 밝은 하늘 사진 위로 구름이 천천히 흘러가는 느낌을 더한다 */
+.sky-shell.theme-default .photo-bg::before {
+  content: '';
+  position: absolute;
+  inset: -10% -60%;
+  background-image:
+    radial-gradient(ellipse 260px 90px at 15% 30%, rgba(255, 255, 255, 0.4), transparent 70%),
+    radial-gradient(ellipse 320px 100px at 55% 60%, rgba(255, 255, 255, 0.3), transparent 70%),
+    radial-gradient(ellipse 220px 80px at 85% 20%, rgba(255, 255, 255, 0.32), transparent 70%);
+  animation: cloudDrift 50s linear infinite alternate;
+  opacity: 0.55;
+}
+@keyframes cloudDrift {
+  from {
+    transform: translateX(-8%);
+  }
+  to {
+    transform: translateX(8%);
+  }
+}
+
 /* ── 떠다니는 배경 오브 (테마에 따라 색이 함께 바뀐다) ───────────────────────── */
 .orb {
   position: absolute;
@@ -201,33 +294,126 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* ── 상단 헤더 바: 화면을 스크롤해도 항상 붙어 있는 브랜드 + 내비게이션 ───── */
+/* 배경 바(blur)는 뷰포트 전체 너비로 깔고, 그 안의 내용만 가운데로 모아서 화면이 넓어져도
+   헤더가 좁은 상자처럼 붙어있지 않고 진짜 화면 상단 바처럼 보이게 한다. */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  width: 100%;
+  background: rgba(11, 15, 24, 0.55);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  animation: riseIn 0.7s var(--sky-ease) both;
+}
+.app-header-inner {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--sky-ink);
+  text-decoration: none;
+}
+.brand-glyph {
+  font-size: 20px;
+}
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.nav-link {
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--sky-ink-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.4s var(--sky-ease);
+}
+.nav-link:hover {
+  color: var(--sky-ink);
+  background: rgba(255, 255, 255, 0.08);
+}
+.nav-link.router-link-exact-active {
+  color: var(--sky-ink);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.nav-link-accent {
+  color: #0b0f18;
+  background: linear-gradient(120deg, var(--sky-accent), var(--sky-accent-deep));
+}
+.nav-link-accent:hover {
+  color: #0b0f18;
+  background: linear-gradient(120deg, var(--sky-accent), var(--sky-accent-deep));
+  filter: brightness(1.08);
+}
+.nav-user {
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sky-ink);
+  white-space: nowrap;
+}
+
+.unit-toggle {
+  margin-left: 4px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  font-family: inherit;
+  letter-spacing: -0.02em;
+  color: #0b0f18;
+  background: linear-gradient(120deg, var(--sky-accent), var(--sky-accent-deep));
+  border: none;
+  cursor: pointer;
+  transition:
+    background 1.2s var(--sky-ease),
+    transform 0.3s var(--sky-ease);
+}
+.unit-toggle:hover {
+  transform: scale(1.05);
+}
+.unit-toggle:active {
+  transform: scale(0.95);
+}
+
 /* ── 메인 레이아웃 ───────────────────────────── */
 .sky-main {
   position: relative;
   z-index: 1;
-  max-width: 1140px;
+  /* 헤더(.app-header-inner)와 같은 폭으로 맞춰서 좌우 정렬이 어긋나지 않게 한다. */
+  max-width: 1320px;
   margin: 0 auto;
-  padding: 80px 32px 120px;
+  padding: 56px 32px 120px;
 }
 
 .hero {
   text-align: center;
-  margin-bottom: 56px;
+  margin-bottom: 48px;
   animation: riseIn 0.9s var(--sky-ease) both;
-}
-
-.eyebrow {
-  display: inline-block;
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--sky-accent);
-  background: rgba(125, 211, 252, 0.08);
-  border: 1px solid rgba(125, 211, 252, 0.18);
-  margin-bottom: 22px;
 }
 
 .hero-title {
@@ -267,7 +453,15 @@ body {
 
 @media (max-width: 768px) {
   .sky-main {
-    padding: 64px 16px 96px;
+    padding: 40px 16px 96px;
+  }
+  .app-header-inner {
+    flex-wrap: wrap;
+    padding: 12px 16px;
+  }
+  .top-nav {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 </style>

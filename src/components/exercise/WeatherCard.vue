@@ -1,6 +1,9 @@
 <script setup>
 import { computed } from 'vue'
-import { getConditionTags } from '@/utils/weatherAdvice'
+import { getConditionTags, getTempTierLabel } from '@/utils/weatherAdvice'
+import { useConfigStore } from '@/stores/configStore'
+
+const configStore = useConfigStore()
 
 // 1. 상위로부터 단방향 주입받을 객체 데이터 규격 검수 (매크로)
 const props = defineProps({
@@ -25,6 +28,7 @@ const props = defineProps({
 })
 
 // 2. 상위로 송신할 커스텀 이벤트 식별자 등록 (매크로)
+// remove-card는 삭제가 되돌릴 수 없는 동작이라 템플릿에서 el-popconfirm으로 한 번 더 확인받은 뒤에만 emit한다.
 const emit = defineEmits(['select-card', 'click-detail', 'add-card', 'remove-card'])
 
 // 한글 받침 유무에 따라 주격 조사(이/가)를 자동으로 붙인다
@@ -38,7 +42,10 @@ const withJosa = (word) => {
 const statusGlyph = computed(
   () => ({ 맑음: '☀️', 비: '🌧️', 구름: '☁️', 눈: '❄️' })[props.cityItem.status] ?? '🌤️',
 )
-const isHot = computed(() => props.cityItem.temp >= 25)
+// 체감온도 기준 5단계 뱃지 — 상세페이지 옷차림 추천과 동일한 기준(getOutfitAdvice)을 재사용
+const tempTier = computed(() => getTempTierLabel(props.cityItem.feelsLike))
+// 카드 호버 그림자 색상은 더움 계열/추움 계열 2그룹으로 단순화
+const isWarmSide = computed(() => tempTier.value.tier === 'hot' || tempTier.value.tier === 'warm')
 
 // UTC 시각에 도시의 오프셋(초)을 더하면 그 도시의 벽시계 시각이 된다
 const localDate = computed(() => {
@@ -72,7 +79,7 @@ const isNight = computed(() => {
   return hour < 6 || hour >= 18
 })
 
-// ✨ 추가: 우산/강풍/더위/추위 조건 뱃지 — 상세페이지의 "오늘의 추천"과 동일한 계산 로직을 재사용
+// 우산/강풍/더위/추위 조건 뱃지 — 상세페이지의 "오늘의 추천"과 동일한 계산 로직을 재사용
 const conditionTags = computed(() =>
   getConditionTags({
     feelsLikeC: props.cityItem.feelsLike,
@@ -88,7 +95,7 @@ const tagLabelMap = { rain: '우산 필요', windy: '강풍 주의', hot: '더�
 <template>
   <div
     class="weather-card"
-    :class="isHot ? 'is-hot' : 'is-cool'"
+    :class="isWarmSide ? 'is-hot' : 'is-cool'"
     @click="emit('select-card', `${withJosa(cityItem.name)} 선택되었습니다.`)"
   >
     <div class="glyph-tile">{{ statusGlyph }}</div>
@@ -105,7 +112,6 @@ const tagLabelMap = { rain: '우산 필요', windy: '강풍 주의', hot: '더�
         <span v-if="timeDiffLabel" class="time-diff">· {{ timeDiffLabel }}</span>
       </p>
 
-      <!-- ✨ 추가: 우산/강풍/더위/추위 추천 뱃지 (상세페이지에는 전체 문구로 더 자세히 나옴) -->
       <div v-if="conditionTags.length > 0" class="advice-badges">
         <span v-for="tag in conditionTags" :key="tag" class="advice-badge" :title="tagLabelMap[tag]">
           {{ tagGlyphMap[tag] }}
@@ -114,9 +120,8 @@ const tagLabelMap = { rain: '우산 필요', windy: '강풍 주의', hot: '더�
     </div>
 
     <div class="card-temp">
-      <span class="temp-value">{{ cityItem.temp }}<small>°</small></span>
-      <span v-if="isHot" class="badge hot">더움</span>
-      <span v-else class="badge cool">선선함</span>
+      <span class="temp-value">{{ configStore.formatTemp(cityItem.temp) }}<small>{{ configStore.unitSymbol }}</small></span>
+      <span class="badge" :class="`tier-${tempTier.tier}`">{{ tempTier.icon }} {{ tempTier.label }}</span>
     </div>
 
     <div class="card-actions">
@@ -144,22 +149,32 @@ const tagLabelMap = { rain: '우산 필요', windy: '강풍 주의', hot: '더�
         </span>
       </button>
 
-      <button
+      <el-popconfirm
         v-if="removable"
-        class="btn-remove"
-        :aria-label="`${cityItem.name} 목록에서 제거`"
-        title="목록에서 제거"
-        @click.stop="emit('remove-card')"
+        title="이 도시를 목록에서 삭제할까요?"
+        confirm-button-text="삭제"
+        cancel-button-text="취소"
+        width="200"
+        @confirm="emit('remove-card')"
       >
-        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path
-            d="M4 4L12 12M12 4L4 12"
-            stroke="currentColor"
-            stroke-width="1.6"
-            stroke-linecap="round"
-          />
-        </svg>
-      </button>
+        <template #reference>
+          <button
+            class="btn-remove"
+            :aria-label="`${cityItem.name} 목록에서 제거`"
+            title="목록에서 제거"
+            @click.stop
+          >
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M4 4L12 12M12 4L4 12"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </template>
+      </el-popconfirm>
     </div>
   </div>
 </template>
@@ -284,16 +299,33 @@ const tagLabelMap = { rain: '우산 필요', windy: '강풍 주의', hot: '더�
   font-weight: 600;
   letter-spacing: 0.04em;
   border-radius: 999px;
+  white-space: nowrap;
 }
-.badge.hot {
+/* 체감온도 5단계 뱃지 색상 — 더움(주황) → 따뜻함(호박) → 선선함(하늘) → 쌀쌀함(청록) → 추움(남색) */
+.badge.tier-hot {
   color: #fdba74;
-  background: rgba(251, 146, 60, 0.12);
-  border: 1px solid rgba(251, 146, 60, 0.25);
+  background: rgba(251, 146, 60, 0.14);
+  border: 1px solid rgba(251, 146, 60, 0.28);
 }
-.badge.cool {
+.badge.tier-warm {
+  color: #fcd34d;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.26);
+}
+.badge.tier-mild {
   color: #7dd3fc;
   background: rgba(125, 211, 252, 0.1);
   border: 1px solid rgba(125, 211, 252, 0.22);
+}
+.badge.tier-cool {
+  color: #67e8f9;
+  background: rgba(34, 211, 238, 0.1);
+  border: 1px solid rgba(34, 211, 238, 0.24);
+}
+.badge.tier-cold {
+  color: #a5b4fc;
+  background: rgba(129, 140, 248, 0.12);
+  border: 1px solid rgba(129, 140, 248, 0.26);
 }
 
 .card-actions {

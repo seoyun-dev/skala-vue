@@ -1,5 +1,4 @@
 <template>
-  <!-- 더블 베젤: 유리판을 알루미늄 트레이에 얹은 구조 -->
   <div class="bezel-shell">
     <div class="bezel-core">
       <slot></slot>
@@ -8,6 +7,7 @@
 </template>
 
 <style scoped>
+/* 더블 베젤: 유리판(bezel-core)을 알루미늄 트레이(bezel-shell)에 얹은 구조 */
 .bezel-shell {
   padding: 6px;
   border-radius: 2rem;

@@ -2,6 +2,8 @@ import http from 'node:http'
 
 import { getCityCount } from './data/citiesStore.js'
 import { handleCitiesRoutes } from './routes/citiesRoutes.js'
+import { handleNotesRoutes } from './routes/notesRoutes.js'
+import { handleShopRoutes } from './routes/shopRoutes.js'
 import { sendError, sendJson, waitForRequestedDelay } from './utils/httpUtils.js'
 
 // Vue 개발 서버(5173)와 겹치지 않고, 다른 skala-vue 계열 프로젝트의 mock-api(기본 3001)와도
@@ -30,6 +32,8 @@ const server = http.createServer(async (request, response) => {
 
     // 각 라우터는 자신이 요청을 처리했으면 true를 반환합니다.
     if (await handleCitiesRoutes(request, response, url)) return
+    if (await handleNotesRoutes(request, response, url)) return
+    if (await handleShopRoutes(request, response, url)) return
 
     sendJson(response, 404, { message: '존재하지 않는 API 경로입니다.' })
   } catch (error) {

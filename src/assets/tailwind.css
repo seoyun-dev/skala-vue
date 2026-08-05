@@ -1,0 +1,6 @@
+/* preflight(전역 리셋 레이어)는 일부러 빼고 theme·utilities만 가져온다. 리셋을 불러오면
+   div/button/table 같은 태그 선택자에 전역으로 적용돼 이미 다크 테마로 세팅해 둔 앱 전체 스타일과
+   충돌할 수 있다. 이 상태에선 유틸리티 클래스가 실제로 붙은 요소만 영향을 받아 안전하다. */
+@layer theme, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);

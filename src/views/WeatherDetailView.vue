@@ -5,10 +5,16 @@ import axios from 'axios'
 import { getWeatherAdvice } from '@/utils/weatherAdvice'
 import { getStyleItemsFor } from '@/data/styleItems'
 import { useWeatherStore } from '@/stores/weatherStore'
+import { useConfigStore } from '@/stores/configStore'
+import RadarMap from '@/components/exercise/RadarMap.vue'
+import ForecastStrip from '@/components/exercise/ForecastStrip.vue'
+import AirQualityCard from '@/components/exercise/AirQualityCard.vue'
+import WeatherNotes from '@/components/exercise/WeatherNotes.vue'
 
 const route = useRoute()
 const router = useRouter()
 const weatherStore = useWeatherStore()
+const configStore = useConfigStore()
 
 const cityData = ref(null)
 const isLoading = ref(false)
@@ -40,6 +46,8 @@ const fetchCityDetail = async () => {
     const raw = response.data
     cityData.value = {
       name: route.query.name || raw.name,
+      lat: raw.coord.lat,
+      lon: raw.coord.lon,
       temp: Math.round(raw.main.temp),
       feelsLike: Math.round(raw.main.feels_like),
       tempMin: Math.round(raw.main.temp_min),
@@ -61,7 +69,7 @@ const fetchCityDetail = async () => {
       sunset: formatTime(raw.sys.sunset),
       observedAt: formatTime(raw.dt),
     }
-    // ✨ 추가: 이 도시의 실제 날씨에 맞춰 전체 화면 배경을 바꾼다 (App.vue가 구독)
+    // App.vue가 activeTheme을 구독해 전체 화면 배경을 이 값에 맞춰 바꾼다
     weatherStore.setActiveTheme(raw.weather[0].main)
   } catch (error) {
     console.error('🔴 상세 정보 로딩 중 네트워크 에러 발생:', error)
@@ -74,7 +82,7 @@ const fetchCityDetail = async () => {
 // 상세 페이지가 화면에 장착되는 시점에 해당 도시의 관측 데이터 요청
 onMounted(fetchCityDetail)
 
-// ✨ 추가: "오늘의 추천" — 우산/옷차림/강풍 조언 + 조건에 맞는 스타일 아이템
+// "지금 이 순간"만 보는 조언 — dayAdvice가 아직 도착하지 않았을 때(예보 API 응답 대기 중)의 임시 대체용.
 const advice = computed(() => {
   if (!cityData.value) return null
   return getWeatherAdvice({
@@ -85,7 +93,12 @@ const advice = computed(() => {
     statusMain: cityData.value.statusMain,
   })
 })
-const recommendedItems = computed(() => (advice.value ? getStyleItemsFor(advice.value.tags) : []))
+
+// ForecastStrip이 5일 예보를 받아오면서 오늘 하루치 시간대별 데이터로 계산해 올려보내는 조언.
+// 도착하면 이걸 우선 쓰고, 그전까지는 위 snapshot 기반 advice로 화면이 비지 않게 한다.
+const dayAdvice = ref(null)
+const displayAdvice = computed(() => dayAdvice.value ?? advice.value)
+const recommendedItems = computed(() => (displayAdvice.value ? getStyleItemsFor(displayAdvice.value.tags) : []))
 </script>
 
 <template>
@@ -108,77 +121,97 @@ const recommendedItems = computed(() => (advice.value ? getStyleItemsFor(advice.
 
     <template v-else>
       <div v-if="cityData" class="info-card">
-        <p class="city-name">📍 {{ cityData.name }}</p>
-        <img class="weather-icon" :src="cityData.icon" :alt="cityData.status" />
-        <p class="temp-hero">{{ cityData.temp }}<span>°C</span></p>
-        <p class="status-line">{{ cityData.status }} · 체감 {{ cityData.feelsLike }}°C</p>
-        <p class="range-line">
-          최저 <strong>{{ cityData.tempMin }}°</strong> / 최고
-          <strong>{{ cityData.tempMax }}°</strong>
-        </p>
+        <div class="hero-block">
+          <p class="city-name">📍 {{ cityData.name }}</p>
+          <img class="weather-icon" :src="cityData.icon" :alt="cityData.status" />
+          <p class="temp-hero">{{ configStore.formatTemp(cityData.temp) }}<span>{{ configStore.unitSymbol }}</span></p>
+          <p class="status-line">{{ cityData.status }} · 체감 {{ configStore.formatTemp(cityData.feelsLike) }}{{ configStore.unitSymbol }}</p>
+          <p class="range-line">
+            최저 <strong>{{ configStore.formatTemp(cityData.tempMin) }}{{ configStore.unitSymbol }}</strong> / 최고
+            <strong>{{ configStore.formatTemp(cityData.tempMax) }}{{ configStore.unitSymbol }}</strong>
+          </p>
+        </div>
 
-        <!-- ✨ 추가: 오늘의 추천 — 히어로 바로 아래, 눈에 띄는 배너로 배치 -->
-        <div v-if="advice" class="advice-banner">
-          <span class="advice-badge-label">✨ 오늘의 추천</span>
+        <div class="detail-columns">
+          <div class="detail-col">
+            <div v-if="displayAdvice" class="advice-banner">
+              <span class="advice-badge-label">✨ 오늘의 추천</span>
 
-          <ul class="advice-list">
-            <li class="advice-row">
-              <span class="advice-icon">{{ advice.umbrella.icon }}</span>
-              <span class="advice-text">{{ advice.umbrella.message }}</span>
-            </li>
-            <li class="advice-row">
-              <span class="advice-icon">{{ advice.outfit.icon }}</span>
-              <span class="advice-text">{{ advice.outfit.message }}</span>
-            </li>
-            <li class="advice-row">
-              <span class="advice-icon">{{ advice.wind.icon }}</span>
-              <span class="advice-text">{{ advice.wind.message }}</span>
-            </li>
-          </ul>
+              <ul class="advice-list">
+                <li class="advice-row">
+                  <span class="advice-icon">{{ displayAdvice.umbrella.icon }}</span>
+                  <span class="advice-text">{{ displayAdvice.umbrella.message }}</span>
+                </li>
+                <li class="advice-row">
+                  <span class="advice-icon">{{ displayAdvice.outfit.icon }}</span>
+                  <span class="advice-text">{{ displayAdvice.outfit.message }}</span>
+                </li>
+                <li class="advice-row">
+                  <span class="advice-icon">{{ displayAdvice.wind.icon }}</span>
+                  <span class="advice-text">{{ displayAdvice.wind.message }}</span>
+                </li>
+                <li v-if="displayAdvice.place" class="advice-row">
+                  <span class="advice-icon">{{ displayAdvice.place.icon }}</span>
+                  <span class="advice-text">{{ displayAdvice.place.message }}</span>
+                </li>
+              </ul>
 
-          <div v-if="recommendedItems.length > 0" class="item-grid">
-            <div v-for="item in recommendedItems" :key="item.id" class="style-item">
-              <span class="item-icon">{{ item.icon }}</span>
-              <span class="item-name">{{ item.name }}</span>
-              <span class="item-tip">{{ item.tip }}</span>
+              <div v-if="recommendedItems.length > 0" class="item-grid">
+                <div v-for="item in recommendedItems" :key="item.id" class="style-item">
+                  <span class="item-icon">{{ item.icon }}</span>
+                  <span class="item-name">{{ item.name }}</span>
+                  <span class="item-tip">{{ item.tip }}</span>
+                </div>
+              </div>
             </div>
+
+            <RadarMap v-if="cityData.lat != null" :lat="cityData.lat" :lon="cityData.lon" />
+          </div>
+
+          <div class="detail-col">
+            <div class="metric-grid">
+              <div class="metric">
+                <span class="metric-label">💧 대기 습도</span>
+                <strong>{{ cityData.humidity }}</strong>
+              </div>
+              <div class="metric">
+                <span class="metric-label">🌬️ 풍속 · 풍향</span>
+                <strong>{{ cityData.wind }} {{ cityData.windDirection }}</strong>
+              </div>
+              <div class="metric">
+                <span class="metric-label">💨 순간 돌풍</span>
+                <strong>{{ cityData.gust }}</strong>
+              </div>
+              <div class="metric">
+                <span class="metric-label">☁️ 구름량</span>
+                <strong>{{ cityData.clouds }}</strong>
+              </div>
+              <div class="metric">
+                <span class="metric-label">🧭 해면 기압</span>
+                <strong>{{ cityData.pressure }}</strong>
+              </div>
+              <div class="metric">
+                <span class="metric-label">👁️ 가시거리</span>
+                <strong>{{ cityData.visibility }}</strong>
+              </div>
+              <div class="metric">
+                <span class="metric-label">🌅 일출</span>
+                <strong>{{ cityData.sunrise }}</strong>
+              </div>
+              <div class="metric">
+                <span class="metric-label">🌇 일몰</span>
+                <strong>{{ cityData.sunset }}</strong>
+              </div>
+            </div>
+
+            <template v-if="cityData.lat != null">
+              <ForecastStrip :lat="cityData.lat" :lon="cityData.lon" @day-advice="(value) => (dayAdvice = value)" />
+              <AirQualityCard :lat="cityData.lat" :lon="cityData.lon" />
+            </template>
           </div>
         </div>
 
-        <div class="metric-grid">
-          <div class="metric">
-            <span class="metric-label">💧 대기 습도</span>
-            <strong>{{ cityData.humidity }}</strong>
-          </div>
-          <div class="metric">
-            <span class="metric-label">🌬️ 풍속 · 풍향</span>
-            <strong>{{ cityData.wind }} {{ cityData.windDirection }}</strong>
-          </div>
-          <div class="metric">
-            <span class="metric-label">💨 순간 돌풍</span>
-            <strong>{{ cityData.gust }}</strong>
-          </div>
-          <div class="metric">
-            <span class="metric-label">☁️ 구름량</span>
-            <strong>{{ cityData.clouds }}</strong>
-          </div>
-          <div class="metric">
-            <span class="metric-label">🧭 해면 기압</span>
-            <strong>{{ cityData.pressure }}</strong>
-          </div>
-          <div class="metric">
-            <span class="metric-label">👁️ 가시거리</span>
-            <strong>{{ cityData.visibility }}</strong>
-          </div>
-          <div class="metric">
-            <span class="metric-label">🌅 일출</span>
-            <strong>{{ cityData.sunrise }}</strong>
-          </div>
-          <div class="metric">
-            <span class="metric-label">🌇 일몰</span>
-            <strong>{{ cityData.sunset }}</strong>
-          </div>
-        </div>
+        <WeatherNotes :city-id="Number(route.params.cityId)" :city-name="cityData.name" />
 
         <p class="observed-line">관측 시각 기준 {{ cityData.observedAt }}</p>
       </div>
@@ -277,17 +310,32 @@ const recommendedItems = computed(() => (advice.value ? getStyleItemsFor(advice.
   font-weight: 600;
 }
 
-.metric-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 24px;
-}
 .observed-line {
   margin: 18px 0 0;
   font-size: 12px;
   letter-spacing: 0.02em;
   color: var(--sky-ink-dim);
+}
+
+/* 넓은 화면에서는 추천(왼쪽)과 상세 정보(오른쪽)가 나란히 보여서 스크롤 없이 한눈에 들어온다 */
+.detail-columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-top: 22px;
+  text-align: left;
+}
+@media (min-width: 860px) {
+  .detail-columns {
+    grid-template-columns: minmax(280px, 360px) 1fr;
+    align-items: start;
+  }
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
 }
 .metric {
   padding: 14px;
@@ -306,14 +354,11 @@ const recommendedItems = computed(() => (advice.value ? getStyleItemsFor(advice.
   color: var(--sky-ink);
 }
 
-/* ✨ 오늘의 추천 — 히어로 바로 아래, 테마 포인트 컬러로 눈에 띄게 강조 */
 .advice-banner {
   position: relative;
   overflow: hidden;
-  margin: 22px 0 4px;
   padding: 20px;
   border-radius: 18px;
-  text-align: left;
   background: linear-gradient(135deg, color-mix(in srgb, var(--sky-accent) 16%, transparent), color-mix(in srgb, var(--sky-accent-deep) 10%, transparent));
   border: 1px solid color-mix(in srgb, var(--sky-accent) 32%, transparent);
   box-shadow: 0 10px 32px -14px color-mix(in srgb, var(--sky-accent) 45%, transparent);
